@@ -14,6 +14,8 @@ import (
 	//"github.com/goki/gi/units"
 	"github.com/goki/ki"
 	//"github.com/goki/ki/kit"
+
+	"time"
 )
 
 func main() {
@@ -100,9 +102,52 @@ func mainrun() {
 
 			buttonStartResult := trow.AddNewChild(gi.KiT_Label, "buttonStartResult").(*gi.Label)
 			buttonStartResult.Text = "<b>Login:</b>"
+			userText := trow.AddNewChild(gi.KiT_TextField, "userText").(*gi.TextField)
+			userText.SetText("Username")
+			userText.SetProp("width", "20em")
 			passwdText := trow.AddNewChild(gi.KiT_TextField, "passwdText").(*gi.TextField)
-	passwdText.SetText("Password")
-		passwdText.SetProp("width", "20em")
+			passwdText.SetText("Password")
+			passwdText.SetProp("width", "20em")
+
+			loginButton := trow.AddNewChild(gi.KiT_Button, "loginButton").(*gi.Button)
+			loginButton.Text = "<b>Log In</b>"
+
+			loginButton.ButtonSig.Connect(rec.This, func(recv, send ki.Ki, sig int64, data interface{}) {
+				//fmt.Printf("Received button signal: %v from button: %v\n", gi.ButtonSignals(sig), send.Name())
+				if sig == int64(gi.ButtonClicked) { // note: 3 diff ButtonSig sig's possible -- important to check
+					// vp.Win.Quit()
+					//gi.PromptDialog(vp, "Button1 Dialog", "This is a dialog!  Various specific types of dialogs are available.", true, true, nil, nil)
+					updt := vp.UpdateStart()
+
+					loginResult := trow.AddNewChild(gi.KiT_Label, "loginResult").(*gi.Label)
+					loginResult.Text = "<i>Logging in as guest... user feature is not avaible yet</i><b></b>"
+					trow.AddNewChild(gi.KiT_Space, "spc2")
+					appsHeader := trow.AddNewChild(gi.KiT_Label, "appsHeader").(*gi.Label)
+
+					appsHeader.Text = "<b>Apps</b>"
+					appsHeader.SetProp("font-size", "x-large")
+					//trow.AddNewChild(gi.KiT_Space, "spc3")
+
+					dateAndTimeButton := trow.AddNewChild(gi.KiT_Button, "dateAndTimeButton").(*gi.Button)
+					dateAndTimeButton.Text = "<b>Date and time</b>"
+
+					dateAndTimeButton.ButtonSig.Connect(rec.This, func(recv, send ki.Ki, sig int64, data interface{}) {
+						//fmt.Printf("Received button signal: %v from button: %v\n", gi.ButtonSignals(sig), send.Name())
+						if sig == int64(gi.ButtonClicked) { // note: 3 diff ButtonSig sig's possible -- important to check
+							// vp.Win.Quit()
+							//gi.PromptDialog(vp, "Button1 Dialog", "This is a dialog!  Various specific types of dialogs are available.", true, true, nil, nil)
+							updt := vp.UpdateStart()
+
+							dateAndTimeResult := trow.AddNewChild(gi.KiT_Label, "dateAndTimeResult").(*gi.Label)
+							dateAndTimeResult.Text = fmt.Sprintf(time.Now().Local().Format("2006-01-02 03:04PM"))
+
+							vp.UpdateEnd(updt)
+						}
+					})
+
+					vp.UpdateEnd(updt)
+				}
+			})
 			vp.UpdateEnd(updt)
 		}
 	})
