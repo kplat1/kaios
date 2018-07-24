@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	//"reflect"
 
@@ -15,10 +16,62 @@ import (
 	"github.com/goki/ki"
 	//"github.com/goki/ki/kit"
 
+	bolt "github.com/coreos/bbolt"
+	"log"
 	"time"
 )
 
+type LoginRec struct {
+	Username string
+	Password string
+	Points   float64
+}
+
+var KaiOSDB *bolt.DB
+
+func LoadLoginTable() []*LoginRec {
+
+	lt := make([]*LoginRec, 0, 100) // 100 is the starting capacity of slice -- increase if you expect more users.
+
+	KaiOSDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("LoginTable"))
+
+		if b != nil {
+			b.ForEach(func(k, v []byte) error {
+				if v != nil {
+					rec := LoginRec{}
+					json.Unmarshal(v, &rec) // loads v value as json into rec
+					lt = append(lt, &rec)   // adds record to login table
+
+				}
+				return nil
+			})
+		}
+		return nil
+	})
+
+	return lt
+}
+
+func SaveNewLogin(rec *LoginRec) {
+	KaiOSDB.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte("LoginTable"))
+		jb, err := json.Marshal(rec) // converts rec to json, as bytes jb
+
+		err = b.Put([]byte(rec.Username), jb)
+		return err
+	})
+}
+
 func main() {
+	var err error
+	KaiOSDB, err = bolt.Open("KaiOS.db", 0600, nil)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer KaiOSDB.Close()
+
 	driver.Main(func(app oswin.App) {
 		mainrun()
 	})
@@ -37,7 +90,7 @@ func mainrun() {
 	rec := ki.Node{}          // receiver for events
 	rec.InitName(&rec, "rec") // this is essential for root objects not owned by other Ki tree nodes
 
-	win := gi.NewWindow2D("gogi-widgets-demo", "GoGi Widgets Demo", width, height, true) // true = pixel sizes
+	win := gi.NewWindow2D("gogi-widgets-demo", "KaiOS", width, height, true) // true = pixel sizes
 
 	//icnm := "widget-wedge-down"
 
@@ -88,6 +141,7 @@ func mainrun() {
 	p1 := trow.AddNewChild(gi.KiT_Label, "p1").(*gi.Label)
 	p1.Text = "<b>KaiOS</b>, a <b>customizable, lightweight</b> OS"
 	p1.SetProp("align-horiz", gi.AlignCenter)
+
 	trow.AddNewChild(gi.KiT_Space, "spc1")
 	buttonStart := trow.AddNewChild(gi.KiT_Button, "buttonStart").(*gi.Button)
 	buttonStart.Text = "Load KaiOS v0.000 pre-alpha"
@@ -101,13 +155,42 @@ func mainrun() {
 			updt := vp.UpdateStart()
 
 			buttonStartResult := trow.AddNewChild(gi.KiT_Label, "buttonStartResult").(*gi.Label)
-			buttonStartResult.Text = "<b>Login:</b>"
+			buttonStartResult.Text = "<b>Sign Up:</b>"
 			userText := trow.AddNewChild(gi.KiT_TextField, "userText").(*gi.TextField)
 			userText.SetText("Username")
 			userText.SetProp("width", "20em")
 			passwdText := trow.AddNewChild(gi.KiT_TextField, "passwdText").(*gi.TextField)
 			passwdText.SetText("Password")
 			passwdText.SetProp("width", "20em")
+
+			signUpButton := trow.AddNewChild(gi.KiT_Button, "signUpButton").(*gi.Button)
+			signUpButton.Text = "<b>Sign up</b>"
+
+			signUpButton.ButtonSig.Connect(rec.This, func(recv, send ki.Ki, sig int64, data interface{}) {
+				//fmt.Printf("Received button signal: %v from button: %v\n", gi.ButtonSignals(sig), send.Name())
+				if sig == int64(gi.ButtonClicked) { // note: 3 diff ButtonSig sig's possible -- important to check
+					// vp.Win.Quit()
+					//gi.PromptDialog(vp, "Button1 Dialog", "This is a dialog!  Various specific types of dialogs are available.", true, true, nil, nil)
+					updt := vp.UpdateStart()
+					usr := userText.Text()
+					passwd := passwdText.Text()
+
+					newLoginRec := LoginRec{Username: usr, Password: passwd, Points: 0}
+					SaveNewLogin(&newLoginRec)
+
+					vp.UpdateEnd(updt)
+				}
+			})
+
+			loginButtonStartResult := trow.AddNewChild(gi.KiT_Label, "loginButtonStartResult").(*gi.Label)
+			loginButtonStartResult.Text = "<b>Log In:</b>"
+
+			userTextLogIn := trow.AddNewChild(gi.KiT_TextField, "userTextLogIn").(*gi.TextField)
+			userTextLogIn.SetText("Username")
+			userTextLogIn.SetProp("width", "20em")
+			passwdTextLogIn := trow.AddNewChild(gi.KiT_TextField, "passwdTextLogIn").(*gi.TextField)
+			passwdTextLogIn.SetText("Password")
+			passwdTextLogIn.SetProp("width", "20em")
 
 			loginButton := trow.AddNewChild(gi.KiT_Button, "loginButton").(*gi.Button)
 			loginButton.Text = "<b>Log In</b>"
@@ -117,8 +200,6 @@ func mainrun() {
 				if sig == int64(gi.ButtonClicked) { // note: 3 diff ButtonSig sig's possible -- important to check
 					// vp.Win.Quit()
 					//gi.PromptDialog(vp, "Button1 Dialog", "This is a dialog!  Various specific types of dialogs are available.", true, true, nil, nil)
-					updt := vp.UpdateStart()
-
 					loginResult := trow.AddNewChild(gi.KiT_Label, "loginResult").(*gi.Label)
 					loginResult.Text = "<i>Logging in as guest... user feature is not avaible yet</i><b></b>"
 					trow.AddNewChild(gi.KiT_Space, "spc2")
@@ -149,6 +230,42 @@ func mainrun() {
 				}
 			})
 			vp.UpdateEnd(updt)
+		}
+	})
+
+	viewlogins := trow.AddNewChild(gi.KiT_Button, "viewlogins").(*gi.Button)
+	viewlogins.SetText("View LoginTable")
+	viewlogins.ButtonSig.Connect(rec.This, func(recv, send ki.Ki, sig int64, data interface{}) {
+		if sig == int64(gi.ButtonClicked) {
+			lt := LoadLoginTable()
+
+			gi.StructTableViewDialog(vp, &lt, true, nil, "Login Table", "", nil, nil, nil)
+		}
+	})
+
+	addlogin := trow.AddNewChild(gi.KiT_Button, "addlogin").(*gi.Button)
+	addlogin.SetText("Add Login")
+	addlogin.ButtonSig.Connect(rec.This, func(recv, send ki.Ki, sig int64, data interface{}) {
+		if sig == int64(gi.ButtonClicked) {
+			rec := LoginRec{}
+			gi.StructViewDialog(vp, &rec, nil, "Enter Login Info", "", recv, func(recv, send ki.Ki, sig int64, data interface{}) {
+				if sig == int64(gi.DialogAccepted) {
+					SaveNewLogin(&rec)
+				}
+			})
+		}
+	})
+
+	quit := trow.AddNewChild(gi.KiT_Button, "quit").(*gi.Button)
+	quit.SetText("Quit")
+	quit.ButtonSig.Connect(rec.This, func(recv, send ki.Ki, sig int64, data interface{}) {
+		if sig == int64(gi.ButtonClicked) {
+			gi.PromptDialog(vp, "Quit", "Quit: Are You Sure?", true, true, recv, func(recv, send ki.Ki, sig int64, data interface{}) {
+				if sig == int64(gi.DialogAccepted) {
+					KaiOSDB.Close()
+					vp.Win.Quit()
+				}
+			})
 		}
 	})
 
