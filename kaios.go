@@ -53,6 +53,16 @@ func LoadLoginTable() []*LoginRec {
 	return lt
 }
 
+func CheckLogin(usr, passwd string) bool {
+	lt := LoadLoginTable()
+	for _, lr := range lt {
+		if lr.Username == usr && lr.Password == passwd {
+			return true
+		}
+	}
+	return false
+}
+
 func SaveNewLogin(rec *LoginRec) {
 	KaiOSDB.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte("LoginTable"))
@@ -200,31 +210,39 @@ func mainrun() {
 				if sig == int64(gi.ButtonClicked) { // note: 3 diff ButtonSig sig's possible -- important to check
 					// vp.Win.Quit()
 					//gi.PromptDialog(vp, "Button1 Dialog", "This is a dialog!  Various specific types of dialogs are available.", true, true, nil, nil)
+					usr := userTextLogIn.Text()
+					passwd := passwdTextLogIn.Text()
+					loginOk := CheckLogin(usr, passwd)
 					loginResult := trow.AddNewChild(gi.KiT_Label, "loginResult").(*gi.Label)
-					loginResult.Text = "<i>Logging in as guest... user feature is not avaible yet</i><b></b>"
-					trow.AddNewChild(gi.KiT_Space, "spc2")
-					appsHeader := trow.AddNewChild(gi.KiT_Label, "appsHeader").(*gi.Label)
+					if loginOk {
+						loginResult.Text = ""
+						trow.AddNewChild(gi.KiT_Space, "spc2")
+						appsHeader := trow.AddNewChild(gi.KiT_Label, "appsHeader").(*gi.Label)
 
-					appsHeader.Text = "<b>Apps</b>"
-					appsHeader.SetProp("font-size", "x-large")
-					//trow.AddNewChild(gi.KiT_Space, "spc3")
+						appsHeader.Text = "<b>Apps</b>"
+						appsHeader.SetProp("font-size", "x-large")
+						//trow.AddNewChild(gi.KiT_Space, "spc3")
 
-					dateAndTimeButton := trow.AddNewChild(gi.KiT_Button, "dateAndTimeButton").(*gi.Button)
-					dateAndTimeButton.Text = "<b>Date and time</b>"
+						dateAndTimeButton := trow.AddNewChild(gi.KiT_Button, "dateAndTimeButton").(*gi.Button)
+						dateAndTimeButton.Text = "<b>Date and time</b>"
 
-					dateAndTimeButton.ButtonSig.Connect(rec.This, func(recv, send ki.Ki, sig int64, data interface{}) {
-						//fmt.Printf("Received button signal: %v from button: %v\n", gi.ButtonSignals(sig), send.Name())
-						if sig == int64(gi.ButtonClicked) { // note: 3 diff ButtonSig sig's possible -- important to check
-							// vp.Win.Quit()
-							//gi.PromptDialog(vp, "Button1 Dialog", "This is a dialog!  Various specific types of dialogs are available.", true, true, nil, nil)
-							updt := vp.UpdateStart()
+						dateAndTimeButton.ButtonSig.Connect(rec.This, func(recv, send ki.Ki, sig int64, data interface{}) {
+							//fmt.Printf("Received button signal: %v from button: %v\n", gi.ButtonSignals(sig), send.Name())
+							if sig == int64(gi.ButtonClicked) { // note: 3 diff ButtonSig sig's possible -- important to check
+								// vp.Win.Quit()
+								//gi.PromptDialog(vp, "Button1 Dialog", "This is a dialog!  Various specific types of dialogs are available.", true, true, nil, nil)
+								updt := vp.UpdateStart()
 
-							dateAndTimeResult := trow.AddNewChild(gi.KiT_Label, "dateAndTimeResult").(*gi.Label)
-							dateAndTimeResult.Text = fmt.Sprintf(time.Now().Local().Format("2006-01-02 03:04PM"))
+								dateAndTimeResult := trow.AddNewChild(gi.KiT_Label, "dateAndTimeResult").(*gi.Label)
+								dateAndTimeResult.Text = fmt.Sprintf(time.Now().Local().Format("2006-01-02 03:04PM"))
 
-							vp.UpdateEnd(updt)
-						}
-					})
+								vp.UpdateEnd(updt)
+							}
+						})
+
+					} else {
+						loginResult.Text = "ERROR: Wrong username or password"
+					}
 
 					vp.UpdateEnd(updt)
 				}
